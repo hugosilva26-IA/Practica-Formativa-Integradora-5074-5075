@@ -1,0 +1,135 @@
+services:
+
+  # ----------------------------------------
+  # NAMENODE: administra el sistema HDFS
+  # ----------------------------------------
+  namenode:
+    build: .
+    container_name: hadoop-namenode
+    hostname: namenode
+    restart: "no"
+
+    ports:
+      - "9870:9870"
+
+    env_file:
+      - ./config
+
+    environment:
+      ENSURE_NAMENODE_DIR: "/tmp/hadoop-root/dfs/name"
+
+    command: ["hdfs", "namenode"]
+
+    volumes:
+      - namenode-data:/tmp/hadoop-root/dfs/name
+      - ./datos:/workspace
+
+    networks:
+      - hadoop-net
+
+
+  # ----------------------------------------
+  # DATANODE 1: almacena bloques HDFS
+  # ----------------------------------------
+  datanode1:
+    build: .
+    container_name: hadoop-datanode1
+    hostname: datanode1
+    restart: "no"
+
+    env_file:
+      - ./config
+
+    command: ["hdfs", "datanode"]
+
+    volumes:
+      - datanode1-data:/tmp/hadoop-root/dfs/data
+
+    depends_on:
+      - namenode
+
+    networks:
+      - hadoop-net
+
+
+  # ----------------------------------------
+  # DATANODE 2: almacena las réplicas
+  # ----------------------------------------
+  datanode2:
+    build: .
+    container_name: hadoop-datanode2
+    hostname: datanode2
+    restart: "no"
+
+    env_file:
+      - ./config
+
+    command: ["hdfs", "datanode"]
+
+    volumes:
+      - datanode2-data:/tmp/hadoop-root/dfs/data
+
+    depends_on:
+      - namenode
+
+    networks:
+      - hadoop-net
+
+
+  # ----------------------------------------
+  # RESOURCEMANAGER: administra recursos YARN
+  # ----------------------------------------
+  resourcemanager:
+    build: .
+    container_name: hadoop-resourcemanager
+    hostname: resourcemanager
+    restart: "no"
+
+    ports:
+      - "8088:8088"
+
+    env_file:
+      - ./config
+
+    command: ["yarn", "resourcemanager"]
+
+    networks:
+      - hadoop-net
+
+
+  # ----------------------------------------
+  # NODEMANAGER: ejecuta tareas YARN
+  # ----------------------------------------
+  nodemanager:
+    build: .
+    container_name: hadoop-nodemanager
+    hostname: nodemanager
+    restart: "no"
+
+    env_file:
+      - ./config
+
+    command: ["yarn", "nodemanager"]
+
+    depends_on:
+      - resourcemanager
+
+    networks:
+      - hadoop-net
+
+
+# ----------------------------------------
+# ALMACENAMIENTO PERSISTENTE
+# ----------------------------------------
+volumes:
+  namenode-data:
+  datanode1-data:
+  datanode2-data:
+
+
+# ----------------------------------------
+# RED INTERNA
+# ----------------------------------------
+networks:
+  hadoop-net:
+    driver: bridge
