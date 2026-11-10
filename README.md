@@ -1,117 +1,96 @@
-# Práctica Formativa Integradora: Consolidación de Almacenamiento, Integridad del Dato y Toma de Contacto con HDFS
+# Práctica Formativa Integradora: integridad de datos y HDFS
 
-Este repositorio contiene la resolución de la práctica integradora para los módulos de **Sistemas de Big Data (5074)** y **Almacenamiento y Gestión de Datos (5075)** del Máster en Inteligencia Artificial y Big Data.
+Repositorio de la práctica de **Sistemas de Big Data (Módulo 5074)** y **Almacenamiento y Gestión de Datos (Módulo 5075)**.
 
-
-
----
-
-##  Estructura del Repositorio
-
-Siguiendo las especificaciones de la entrega, el proyecto se organiza del siguiente modo:
+## Estructura del repositorio
 
 ```text
 .
-├── README.md                 # Informe técnico de la práctica (este documento)
-├── scripts/
-│   └── limpiar_telemetria.py        # Script en Python para limpieza
+├── Dockerfile
+├── docker-compose.yml
+├── config
 ├── datos/
-│   └── .gitkeep              # Control de versión para la carpeta de datos
+│   ├── telemetria_envios.csv
+│   └── telemetria_limpia.csv
+├── scripts/
+│   └── limpiar_telemetria.py
 └── evidencias/
-    ├── 01_hashes_sha256.png       # Verificación de integridad SHA-256 en terminal
-    ├── 02_jps_servicios.png       # Procesos Java activos en el contenedor
-    ├── 03_hdfs_comandos_fsck.png  # Carga en HDFS, inspección CLI y estado con fsck
-    └── 04_webui_hdfs_browse.png   # Exploración del dataset en la Web UI del NameNode
+    ├── 01_hashes_sha256.png
+    ├── 02_jps_servicios.png
+    ├── 03_hdfs_comandos_fsck.png
+    └── 04_webui_hdfs_browse.png
 ```
 
----
+## 1. Integridad del dataset (Módulo 5075)
 
-##  Sección 1: Aseguramiento e Integridad del Dato (Módulo 5075)
+Se calculó SHA-256 sobre los bytes de cada CSV. El original se conserva y el script `scripts/limpiar_telemetria.py` genera `datos/telemetria_limpia.csv`, eliminando filas duplicadas, registros con valores nulos en los campos críticos, pesos no positivos, temperaturas superiores a 50 °C y estados de envío no reconocidos.
 
-Antes de subir cualquier conjunto de datos a producción, debemos garantizar su origen e integridad mediante funciones hash unidireccionales (**SHA-256**).
+| Archivo | Momento | SHA-256 |
+|---|---|---|
+| `datos/telemetria_envios.csv` | Original, antes de depurar | `4471C18A0284B3AA5B32A0713E691E3C7FCADAE402F105E901C7C57F49474911` |
+| `datos/telemetria_limpia.csv` | Resultado, después de depurar | `23FE3D0B4801E8D90FE7BD79004F79C74058FA79C6DE0A62D0964CE616F42513` |
 
-### 1. Hash del dataset original (`telemetria_envios.csv`)
-Calculamos el checksum del fichero crudo recibido con anomalías (duplicados, valores nulos `NaN`, pesos negativos como `-45.50 kg`, temperaturas imposibles como `98.4 ºC` y estados no catalogados):
-
-* **Hash SHA-256 (Original):**  
-  `4471C18A028483AA5832A0713E691E3C7FCADAE482F105E981C7C57F49474911`
-
-### 2. Proceso de depuración
-Mediante el script `scripts/limpiar_telemetria.py` ejecutamos las siguientes reglas de negocio y limpieza:
-1. Eliminación de filas duplicadas.
-2. Tratamiento o descartes de nulos en columnas críticas (`peso_kg`, `temp_celsius`, `destino`).
-3. Filtrado de outliners/inconsistencias (valores de peso $>0$, temperaturas dentro de rango lógico y estados válidos).
-
-### 3. Hash del dataset depurado (`telemetria_limpia.csv`)
-Tras la limpieza, generamos el fichero listo para ingesta y comprobamos cómo la **propiedad de avalancha** de SHA-256 hace que la firma cambie completamente:
-
-* **Hash SHA-256 (Depurado):**  
-  `23FE3008480158098FE78079064F79C74858FA79C60E0A6208964CE616F42513`
-
->  *La captura con los cálculos en PowerShell/Bash se encuentra en `evidencias/01_hashes_sha256.png`.*
-
----
-
-##  Sección 2: Despliegue de Entorno y HDFS (Módulo 5074)
-
-### 1. Levantar la infraestructura
-Desplegamos un entorno de Apache Hadoop 3.4.0 mediante **Docker Compose** que incluye NameNode, DataNodes (`datanode1` y `datanode2`), ResourceManager y NodeManager.
+Para repetir la limpieza y obtener ambos hashes:
 
 ```bash
-docker compose up -d
-docker exec -it namenode bash
+python -m pip install pandas
+python scripts/limpiar_telemetria.py
 ```
 
-### 2. Auditoría de daemons Java (`jps`)
-Verificamos dentro del contenedor que los servicios esenciales están arriba ejecutando el comando `jps`.
->  *Evidencia disponible en `evidencias/02_jps_servicios.png`.*
+La firma SHA-256 cambia porque el CSV depurado contiene bytes distintos del original. La captura del cálculo está en [01_hashes_sha256.png](evidencias/01_hashes_sha256.png).
 
-### 3. Operaciones CLI en HDFS
-Dentro del NameNode, ejecutamos la secuencia de comandos para ingestar y auditar el dataset:
+## 2. Despliegue y exploración HDFS (Módulo 5074)
+
+El entorno se construye con Docker Compose. El Dockerfile añade un JDK 8 porque la imagen base de Hadoop incluye Java de ejecución, pero no la herramienta de diagnóstico `jps`. Compose inicia NameNode, dos DataNodes, ResourceManager y NodeManager. Los puertos publicados en el equipo anfitrión son **9870** (Web UI del NameNode) y **8088** (Web UI de YARN); el puerto RPC de HDFS, **8020**, se usa en la red interna de Compose.
 
 ```bash
-# 1. Crear directorio de destino en HDFS
-hdfs dfs -mkdir -p /empresa/logistica/input
-
-# 2. Ingestar el dataset saneado desde el volumen montado (/workspace)
-hdfs dfs -put /workspace/telemetria_limpia.csv /empresa/logistica/input/
-
-# 3. Listar el contenido del directorio
-hdfs dfs -ls /empresa/logistica/input/
-
-# 4. Inspeccionar la cabecera e iniciales del fichero cargado
-hdfs dfs -head /empresa/logistica/input/telemetria_limpia.csv
-
-# 5. Auditoría de bloques y réplicas
-hdfs fsck /empresa/logistica/input/telemetria_limpia.csv -files -blocks -locations
+docker compose up -d --build
+docker compose ps
 ```
 
+Cada daemon se ejecuta en un contenedor distinto. Para comprobar el NameNode y los DataNodes con `jps`:
 
+```bash
+docker compose exec namenode jps
+docker compose exec datanode1 jps
+docker compose exec datanode2 jps
+```
 
-> *Evidencias de la ejecución de comandos y fsck en `evidencias/03_hdfs_comandos_fsck.png`.*  
-> *Captura de la navegación Web UI (`http://localhost:9870`) en `evidencias/04_webui_hdfs_browse.png`.*
+En cada salida aparece el proceso Hadoop correspondiente y el proceso temporal `Jps`. La evidencia solicitada está en [02_jps_servicios.png](evidencias/02_jps_servicios.png).
 
----
+El directorio local `datos/` se monta como `/workspace` en el NameNode. Estos comandos cargan el CSV depurado, lo listan y revisan sus bloques y ubicaciones:
 
-##  Sección 3: Análisis Crítico — Tolerancia a Fallos e Integridad en HDFS
+```bash
+docker compose exec namenode hdfs dfs -mkdir -p /empresa/logistica/input
+docker compose exec namenode hdfs dfs -put /workspace/telemetria_limpia.csv /empresa/logistica/input/
+docker compose exec namenode hdfs dfs -ls /empresa/logistica/input/
+docker compose exec namenode hdfs fsck /empresa/logistica/input/telemetria_limpia.csv -files -blocks -locations
+```
 
-**¿Por qué un fichero en HDFS no se corrompe ni se pierde aunque falle o se apague un DataNode en un clúster de producción?**
+La configuración de esta práctica establece un factor de replicación de **2**. La evidencia de `put`, `ls` y `fsck` está en [03_hdfs_comandos_fsck.png](evidencias/03_hdfs_comandos_fsck.png). La Web UI del NameNode está disponible en [http://localhost:9870](http://localhost:9870); desde **Utilities → Browse the file system** se puede localizar `/empresa/logistica/input/telemetria_limpia.csv`. Captura: [04_webui_hdfs_browse.png](evidencias/04_webui_hdfs_browse.png).
 
-La resistencia y tolerancia a fallos de HDFS no es casualidad, sino el pilar sobre el que se diseña el almacenamiento distribuido en Big Data. En primer lugar, esto se debe al **mecanismo de replicación de bloques**. Cuando subimos un archivo a HDFS (por ejemplo, nuestro dataset de telemetría), este se divide en bloques de tamaño fijo (habitualmente 128 MB en producción) y cada bloque se replica de forma transparente en múltiples nodos físicos (definido por el *replication factor*, por defecto 3). Si un DataNode cae o se desconecta de la red, la información sigue estando accesible en las otras réplicas alojadas en nodos distintos dentro o fuera del mismo rack.
+## 3. Análisis crítico: tolerancia a fallos en HDFS
 
-En segundo lugar, entra en juego el papel activo del **NameNode** y el sistema de latidos (**Heartbeats**). Los DataNodes envían señales periódicas y reportes de bloques (*Block Reports*) al NameNode. Si este deja de recibir el heartbeat de un DataNode durante un tiempo determinado, lo declara *unhealthy* o muerto. Inmediatamente, el NameNode consulta su mapa de metadatos, detecta qué bloques han perdido nivel de réplica y gestiona de forma autónoma la creación de nuevas copias en otros DataNodes activos, restaurando el factor de réplica deseado sin intervención humana ni interrupción del servicio.
+HDFS divide los archivos en bloques y guarda varias réplicas de cada bloque en DataNodes distintos. Si un DataNode deja de responder, el NameNode lo detecta al dejar de recibir sus *heartbeats*. Mientras quede una réplica legible, los clientes pueden seguir leyendo el bloque desde otro DataNode. El NameNode identifica los bloques cuya cantidad de réplicas cayó por debajo del factor configurado y ordena nuevas copias cuando hay DataNodes disponibles.
 
-Por último, respecto a la **corrupción de datos** (bit rot o errores de transmisión), HDFS realiza un control continuo de integridad mediante **checksums (CRC-32)**. Cada vez que un cliente lee un bloque de HDFS, verifica silenciosamente que la suma de comprobación coincida con la generada durante la escritura. Si detecta un bloque corrupto en un DataNode, el cliente ignora ese bloque defectuoso, lee la copia sana desde otro DataNode y notifica al NameNode para que elimine el bloque corrupto y regenere uno nuevo.
+La replicación ayuda frente a la pérdida de un nodo, y los *checksums* permiten detectar bloques dañados durante la lectura. Si una réplica no pasa la comprobación, el cliente puede leer una copia válida y HDFS puede volver a replicar el bloque. La tolerancia depende de que sobreviva al menos una réplica y de que los nodos y sus discos no fallen todos a la vez; la replicación no sustituye a las copias de seguridad. La alta disponibilidad del propio NameNode requiere una configuración adicional.
 
----
+En esta práctica hay dos DataNodes y el factor de replicación está configurado en 2. Si uno falla, la copia restante permite conservar y leer los datos, pero no queda otro DataNode disponible para restaurar dos réplicas hasta que se incorpore uno. En un clúster de producción, los nodos suelen distribuirse entre distintos hosts y racks para reducir el riesgo de fallos correlacionados.
 
-##  Sección 4: Galería de Evidencias Gráficas
+## 4. Evidencias gráficas
 
-| Evidencia | Descripción | Archivo |
-| :--- | :--- | :--- |
-| **01** | Hashes SHA-256 pre y post depuración | `evidencias/01_hashes_sha256.png` |
-| **02** | Salida del comando `jps` (Servicios Hadoop) | `evidencias/02_jps_servicios.png` |
-| **03** | Comandos HDFS (`put`, `ls`, `head`) y auditoría `fsck` | `evidencias/03_hdfs_comandos_fsck.png` |
-| **04** | Explorador de archivos en NameNode Web UI (`:9870`) | `evidencias/04_webui_hdfs_browse.png` |
+### 01. Hashes SHA-256 antes y después de la depuración
 
----
+![Cálculo de hashes SHA-256](evidencias/01_hashes_sha256.png)
+
+### 02. Procesos Hadoop con `jps`
+
+![Salida de jps dentro del contenedor](evidencias/02_jps_servicios.png)
+
+### 03. Carga y revisión de bloques HDFS
+
+![Comandos HDFS y salida de fsck](evidencias/03_hdfs_comandos_fsck.png)
+
+### 04. Explorador HDFS de la Web UI
+
+![Archivo en el explorador del NameNode](evidencias/04_webui_hdfs_browse.png)
