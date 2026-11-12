@@ -91,6 +91,7 @@ En esta práctica hay dos DataNodes y el factor de replicación está configurad
 
 ![Comandos HDFS y salida de fsck](evidencias/03_hdfs_comandos_fsck.png)
 ![](evidencias/03_1_hdfs_comandos_fsck.png)
+![](evidencias/03_2_hdfs_comandos_fsck.png)
 
 ### 04. Explorador HDFS de la Web UI
 
