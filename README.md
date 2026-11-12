@@ -54,6 +54,8 @@ Cada daemon se ejecuta en un contenedor distinto. Para comprobar el NameNode y l
 docker compose exec namenode jps
 docker compose exec datanode1 jps
 docker compose exec datanode2 jps
+docker compose exec resourcemanager jps
+docker compose exec nodemanager jps
 ```
 
 En cada salida aparece el proceso Hadoop correspondiente y el proceso temporal `Jps`. La evidencia solicitada está en [02_jps_servicios.png](evidencias/02_jps_servicios.png).
@@ -65,6 +67,9 @@ docker compose exec namenode hdfs dfs -mkdir -p /empresa/logistica/input
 docker compose exec namenode hdfs dfs -put /workspace/telemetria_limpia.csv /empresa/logistica/input/
 docker compose exec namenode hdfs dfs -ls /empresa/logistica/input/
 docker compose exec namenode hdfs fsck /empresa/logistica/input/telemetria_limpia.csv -files -blocks -locations
+docker compose exec namenode hdfs dfs -cat /empresa/logistica/input/telemetria_limpia.csv
+docker compose exec namenode hdfs dfs -head /empresa/logistica/input/telemetria_limpia.csv
+docker compose exec namenode hdfs dfs -tail /empresa/logistica/input/telemetria_limpia.csv
 ```
 
 La configuración de esta práctica establece un factor de replicación de **2**. La evidencia de `put`, `ls` y `fsck` está en [03_hdfs_comandos_fsck.png](evidencias/03_hdfs_comandos_fsck.png). La Web UI del NameNode está disponible en [http://localhost:9870](http://localhost:9870); desde **Utilities → Browse the file system** se puede localizar `/empresa/logistica/input/telemetria_limpia.csv`. Captura: [04_webui_hdfs_browse.png](evidencias/04_webui_hdfs_browse.png).
