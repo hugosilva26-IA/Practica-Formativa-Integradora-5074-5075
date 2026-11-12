@@ -76,11 +76,11 @@ La configuración de esta práctica establece un factor de replicación de **2**
 
 ## 3. Análisis crítico: tolerancia a fallos en HDFS
 
-HDFS divide los archivos en bloques y guarda varias réplicas de cada bloque en DataNodes distintos. Si un DataNode deja de responder, el NameNode lo detecta al dejar de recibir sus *heartbeats*. Mientras quede una réplica legible, los clientes pueden seguir leyendo el bloque desde otro DataNode. El NameNode identifica los bloques cuya cantidad de réplicas cayó por debajo del factor configurado y ordena nuevas copias cuando hay DataNodes disponibles.
+HDFS divide los archivos en bloques y guarda varias copias de cada uno en diferentes DataNodes. De esta forma, si uno de los nodos deja de funcionar, los datos no se pierden, ya que se puede acceder a otra copia almacenada en otro nodo. El NameNode detecta estos fallos porque deja de recibir señales (heartbeats) del DataNode y, si es necesario, ordena crear nuevas copias para mantener la información protegida.
 
-La replicación ayuda frente a la pérdida de un nodo, y los *checksums* permiten detectar bloques dañados durante la lectura. Si una réplica no pasa la comprobación, el cliente puede leer una copia válida y HDFS puede volver a replicar el bloque. La tolerancia depende de que sobreviva al menos una réplica y de que los nodos y sus discos no fallen todos a la vez; la replicación no sustituye a las copias de seguridad. La alta disponibilidad del propio NameNode requiere una configuración adicional.
+Además, HDFS utiliza un sistema de comprobación llamado checksums, que permite detectar si algún bloque está dañado. Si esto ocurre, puede utilizar otra copia que esté en buen estado. Esto hace que el sistema sea más seguro, aunque depende de que siga existiendo al menos una copia válida. También hay que tener en cuenta que tener varias copias no sustituye a realizar copias de seguridad.
 
-En esta práctica hay dos DataNodes y el factor de replicación está configurado en 2. Si uno falla, la copia restante permite conservar y leer los datos, pero no queda otro DataNode disponible para restaurar dos réplicas hasta que se incorpore uno. En un clúster de producción, los nodos suelen distribuirse entre distintos hosts y racks para reducir el riesgo de fallos correlacionados.
+En nuestra práctica tenemos dos DataNodes y hemos configurado el factor de replicación en 2. Esto significa que cada bloque tiene dos copias. Si uno de los DataNodes falla, todavía podemos acceder a los datos desde el otro, aunque no se podrán recuperar las dos copias hasta que haya otro nodo disponible. En un entorno real, se suelen utilizar más nodos y distribuirlos en diferentes equipos para reducir el riesgo de perder información.
 
 ## 4. Evidencias gráficas
 
